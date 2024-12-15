@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Alert } from "react-native";
 import { Header } from "@/components/Header";
 import { PresentationForm } from "../components/PresentationForm";
 import { ActionButtons } from "../components/ActionButtons";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 const tones = { Professional: "professional", Creative: "creative" };
 
 export default function App() {
@@ -64,6 +66,40 @@ export default function App() {
     console.log("Ads are being shown");
     setCredits((prevCredits) => prevCredits - 10);
   };
+  const generatePPT = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/generate-ppt/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: input.topic,
+          template: "dark", // TODO: make this dynamic
+          slides: input.numberOfSlides,
+          tone: input.tone,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PPT");
+      }
+
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const base64String = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+
+      const fileUri = FileSystem.documentDirectory + "presentation.pptx";
+      await FileSystem.writeAsStringAsync(fileUri, base64String.split(",")[1]);
+
+      await Sharing.shareAsync(fileUri);
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    }
+  };
 
   return (
     <>
@@ -80,7 +116,10 @@ export default function App() {
           tones={tones}
         />
 
-        <ActionButtons handleShowAds={handleShowAds} />
+        <ActionButtons
+          handleShowAds={handleShowAds}
+          generatePPT={generatePPT}
+        />
 
         <Text style={styles.creditsText}>Credits Left: {credits}</Text>
       </View>

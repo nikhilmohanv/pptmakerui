@@ -3,13 +3,14 @@ import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 
 interface ActionButtonsProps {
   handleShowAds: () => void;
+  generatePPT: () => void;
 }
 
-export const ActionButtons = ({ handleShowAds }: ActionButtonsProps) => {
+export const ActionButtons = ({ handleShowAds, generatePPT }: ActionButtonsProps) => {
   return (
     <View>
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Sign Up</Text>
+      <TouchableOpacity style={styles.button} onPress={generatePPT}>
+        <Text style={styles.buttonText}>Generate</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleShowAds}>
         <Text style={styles.buttonText}>Show Ads</Text>
