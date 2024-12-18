@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { Header } from "@/components/Header";
 import { PresentationForm } from "../components/PresentationForm";
-import { ActionButtons } from "../components/ActionButtons";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
@@ -74,7 +73,7 @@ export default function App() {
       const reader = new FileReader();
 
       reader.onloadend = async () => {
-        const base64data = reader.result?.split(',')[1];
+        const base64data = (reader.result as string)?.split(',')[1];
 
         // Create directory if it doesn't exist
         const directoryUri = FileSystem.documentDirectory + "pptmakerai/";
@@ -116,7 +115,7 @@ export default function App() {
       reader.readAsDataURL(blob);
     } catch (error) {
       console.error("Error during PPT generation:", error);
-      Alert.alert("Error", error.message);
+      Alert.alert("Error", error instanceof Error ? error.message : "An unknown error occurred");
     } finally {
       setLoading(false);
     }
