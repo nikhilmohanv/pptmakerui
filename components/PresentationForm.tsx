@@ -51,7 +51,7 @@ export const PresentationForm = ({
             inputIOS: styles.picker,
             inputAndroid: styles.picker,
           }}
-          placeholder={{ label: "Tone of PPT", value: "", color: "#9EA0A4" }}
+          placeholder={{ label: "Select Tone", value: "", color: "#9EA0A4" }}
         />
       </View>
     </View>
@@ -68,6 +68,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     height: 100,
     textAlignVertical: "top",
+  },
+  button: {
+    backgroundColor: "#000",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 18,
   },
   input: {
     borderWidth: 0.6,

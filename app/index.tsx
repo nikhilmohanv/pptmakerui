@@ -1,10 +1,19 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  Button,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import { Header } from "@/components/Header";
 import { PresentationForm } from "../components/PresentationForm";
 import { ActionButtons } from "../components/ActionButtons";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
+
 const tones = { Professional: "professional", Creative: "creative" };
 
 export default function App() {
@@ -15,95 +24,107 @@ export default function App() {
     tone: "professional",
   });
   const [loading, setLoading] = useState(false);
+  const [fileUri, setFileUri] = useState<string | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setInput((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleGeneratePresentation = async () => {
-    if (!input.topic) {
-      alert("Please fill in all fields");
-      return;
-    }
+  const handleShowAds = () => {
+    console.log("Ads are being shown");
+    setCredits((prevCredits) => prevCredits + 10); // Adding credits for ads
+  };
 
-    if (credits < 10) {
-      // Example cost of 10 credits per presentation
-      alert("Not enough credits");
+  // Updated generatePPT function to handle blob properly with added logs
+  const generatePPT = async () => {
+    if (loading) return; // Prevent multiple requests
+
+    // Input validation
+    if (!input.topic || !input.numberOfSlides || !input.tone) {
+      Alert.alert("Error", "Please fill in all fields before generating the presentation.");
       return;
     }
 
     setLoading(true);
+
     try {
-      // Your existing API call logic here
-      const presentationData = {
-        ...input,
-        numberOfSlides: parseInt(input.numberOfSlides),
-      };
-
-      const response = await fetch("YOUR_BACKEND_URL/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(presentationData),
-      });
-
-      const result = await response.json();
-      // const fileUri = `${FileSystem.documentDirectory}presentation.pptx`;
-      // await Sharing.shareAsync(fileUri);
-
-      // Deduct credits after successful generation
-      setCredits((prev) => prev - 10);
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Error generating presentation");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleShowAds = () => {
-    console.log("Ads are being shown");
-    setCredits((prevCredits) => prevCredits - 10);
-  };
-  const generatePPT = async () => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/generate-ppt/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          topic: input.topic,
-          template: "dark", // TODO: make this dynamic
-          slides: input.numberOfSlides,
-          tone: input.tone,
-        }),
-      });
+      console.log("Input data:", input);
+      const response = await fetch(
+        "https://pptmakerbackend.onrender.com/generate-ppt/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            topic: input.topic,
+            template: "tech", // TODO: make this dynamic
+            slides: parseInt(input.numberOfSlides),
+            tone: input.tone,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to generate PPT");
       }
 
+      // Handle the response as a blob
       const blob = await response.blob();
       const reader = new FileReader();
-      const base64String = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
 
-      const fileUri = FileSystem.documentDirectory + "presentation.pptx";
-      await FileSystem.writeAsStringAsync(fileUri, base64String.split(",")[1]);
+      reader.onloadend = async () => {
+        const base64data = reader.result?.split(',')[1];
 
-      await Sharing.shareAsync(fileUri);
+        // Create directory if it doesn't exist
+        const directoryUri = FileSystem.documentDirectory + "pptmakerai/";
+        const dirInfo = await FileSystem.getInfoAsync(directoryUri);
+        console.log("Directory info:", dirInfo);
+
+        if (!dirInfo.exists) {
+          console.log("Creating directory:", directoryUri);
+          await FileSystem.makeDirectoryAsync(directoryUri, {
+            intermediates: true,
+          });
+        }
+
+        // Generate a unique file name
+        const baseFileName = input.topic.replace(/\s+/g, "_").substring(0, 8);
+        let fileUri = `${directoryUri}${baseFileName}.pptx`;
+        let fileExists = await FileSystem.getInfoAsync(fileUri);
+
+        let counter = 1;
+        while (fileExists.exists) {
+          fileUri = `${directoryUri}${baseFileName}_${counter}.pptx`;
+          fileExists = await FileSystem.getInfoAsync(fileUri);
+          counter++;
+        }
+
+        // Save the file to the directory
+        if (base64data) {
+          console.log("Writing file to:", fileUri);
+          await FileSystem.writeAsStringAsync(fileUri, base64data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          setFileUri(fileUri); // Set the file URI in state
+          console.log("File saved successfully:", fileUri);
+        } else {
+          console.error("Base64 data is undefined");
+        }
+      };
+
+      reader.readAsDataURL(blob);
     } catch (error) {
+      console.error("Error during PPT generation:", error);
       Alert.alert("Error", error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
-      <Header credits={credits} />
+      {/* <Header credits={credits} /> */}
       <View style={styles.container}>
         <Text style={styles.title}>Create Stunning Presentations</Text>
         <Text style={styles.subtitle}>
@@ -116,12 +137,44 @@ export default function App() {
           tones={tones}
         />
 
-        <ActionButtons
+        {/* <ActionButtons
           handleShowAds={handleShowAds}
           generatePPT={generatePPT}
-        />
+        /> */}
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={generatePPT}
+          disabled={loading}
+          
+        >
+          <Text style={styles.buttonText}>
+            {loading ? (
+              <ActivityIndicator size="large" color="#0000ff" />
+            ) : (
+              "Generate"
+            )}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleShowAds}>
+          <Text style={styles.buttonText}>Show Ads</Text>
+        </TouchableOpacity>
 
         <Text style={styles.creditsText}>Credits Left: {credits}</Text>
+        {/* <Button
+          title=
+          onPress={generatePPT}
+          disabled={loading}
+        /> */}
+        {loading && <ActivityIndicator size="large" color="#0000ff" />}
+        {fileUri && (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => Sharing.shareAsync(fileUri)}
+          >
+            <Text style={styles.cardTitle}>{input.topic}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </>
   );
@@ -139,6 +192,18 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 10,
   },
+  button: {
+    backgroundColor: "#000",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
   subtitle: {
     fontSize: 16,
     color: "gray",
@@ -149,5 +214,17 @@ const styles = StyleSheet.create({
     color: "gray",
     marginTop: 10,
     textAlign: "center",
+  },
+  card: {
+    backgroundColor: "#f9f9f9",
+    padding: 20,
+    marginVertical: 10,
+    borderRadius: 10,
+    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)",
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
